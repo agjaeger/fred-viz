@@ -14,28 +14,9 @@
 		<div id="dataset-picker"></div>
     
 		<script type="text/javascript">
-			// data aggregation
-			var zipped = 0;
-			
-			$.ajax({
-				type: 'GET',
-				dataType: "json",
-				async: true,
-				url: 'https://cdn.rawgit.com/agjaeger/fred-viz/master/data/zipped.json',
-				success: function(data) {
-					zipped = data;
-				}
-			});
-		
-			// viz
 			var margin = { top: 50, right: 0, bottom: 100, left: 100 };
 			var width = 480 - margin.left - margin.right;
-			var height = 480 - margin.top - margin.bottom;
-			var gridSize = Math.floor(width / 6);
-			var buckets = 9;
-			var legendElementWidth = width / buckets;
-			var colors = ["#CCE5FF","#99CCFF","#66B2FF","#3399FF","#0080FF","#0066CC","#004C99","#003366","#001933"]; 
-			var dataLabels = ["EXPCH", "EXPGE", "EXPMX", "IMPCH", "IMPGE", "IMPMX"];
+			var height = 500 - margin.top - margin.bottom;
 
 			var svg = d3.select("#chart").append("svg")
 				.attr("width", width + margin.left + margin.right)
@@ -43,40 +24,106 @@
 				.append("g")
 				.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-			var leftLabels = svg.selectAll(".dayLabel")
-				.data(dataLabels)
-				.enter().append("text")
-					.text(function (d) { return d; })
-					.attr("x", 0)
-					.attr("y", function (d, i) { return i * gridSize; })
-					.style("text-anchor", "end")
-					.attr("transform", "translate(-6," + gridSize / 1.5 + ")")
-					.attr("class", function (d, i) { return ((i >= 0 && i <= 4) ? "dayLabel mono axis axis-workweek" : "dayLabel mono axis"); });
-
-			var topLabels = svg.selectAll(".timeLabel")
-				.data(dataLabels)
-				.enter().append("text")
-					.text(function(d) { return d; })
-					.attr("x", function(d, i) { return i * gridSize; })
-					.attr("y", 0)
-					.style("text-anchor", "middle")
-					.attr("transform", "translate(" + gridSize / 2 + ", -6)")
-					.attr("class", function(d, i) { return ((i >= 7 && i <= 16) ? "timeLabel mono axis axis-worktime" : "timeLabel mono axis"); });
-
-			var tip = d3.tip()
-				.attr('class', 'd3-tip')
-				.offset([-10, 0])
-				.html(function(d) {
-					return "<strong>Correlation:</strong> <span>" + d['value'].toFixed(4) + "</span>";
-				});
-			
-			svg.call(tip);
-			
 			var lineGraph = function(key1, key2) {
-				console.log(key1 + " " + key2);
+				d3.selectAll("svg > *").remove();
+				
+				var	parseDate = d3.time.format("%d-%b-%y").parse;
+				
+				var	margin = {top: 30, right: 40, bottom: 30, left: 50};
+				var width = 600 - margin.left - margin.right;
+				var height = 270 - margin.top - margin.bottom;
+
+				var	x = d3.time.scale().range([0, width]);
+				var	y = d3.scale.linear().range([height, 0]);
+
+				var	xAxis = d3.svg.axis().scale(x)
+					.orient("bottom").ticks(5);
+
+				var	yAxis = d3.svg.axis().scale(y)
+					.orient("left").ticks(5);
+	
+				var keyline1 = d3.svg.line()
+					.x(function(d) {
+						return x(d.date); 
+					})
+					.y(function(d) { 
+						return y(d.open); 
+					});
+	
+				var keyline2 = d3.svg.line()
+					.x(function(d) {
+						return x(d.date); 
+					})
+					.y(function(d) { 
+						return y(d.open); 
+					});
+
+				d3.json('https://cdn.rawgit.com/agjaeger/fred-viz/master/data/zipped.json',   
+					function(error, data) {	
+						x.domain(d3.extent(data, function(d) { return d.date; }));
+						y.domain([0, d3.max(data, function(d) { return Math.max(d.close, d.open); })]);
+						
+						// Keyline 1
+						svg.append("path")
+							.attr("class", "line")
+							.attr("d", keyline1(d3.entries(data)));
+
+						// Keyline 2
+						svg.append("path")
+							.attr("class", "line")
+							.style("stroke", "red")
+							.attr("d", keyline2(d3.entries(data)));
+
+						// X Axis
+						svg.append("g")
+							.attr("class", "x axis")
+							.attr("transform", "translate(0," + height + ")")
+							.call(xAxis);
+
+						// Y Axis
+						svg.append("g")
+							.attr("class", "y axis")
+							.call(yAxis);
+					}
+				);
 			};
 			
 			var heatmapChart = function() {
+				var gridSize = Math.floor(width / 6);
+				var buckets = 9;
+				var legendElementWidth = width / buckets;
+				var colors = ["#CCE5FF","#99CCFF","#66B2FF","#3399FF","#0080FF","#0066CC","#004C99","#003366","#001933"]; 
+				var dataLabels = ["EXPCH", "EXPGE", "EXPMX", "IMPCH", "IMPGE", "IMPMX"];
+
+				var leftLabels = svg.selectAll(".dayLabel")
+					.data(dataLabels)
+					.enter().append("text")
+						.text(function (d) { return d; })
+						.attr("x", 0)
+						.attr("y", function (d, i) { return i * gridSize; })
+						.style("text-anchor", "end")
+						.attr("transform", "translate(-6," + gridSize / 1.5 + ")")
+						.attr("class", function (d, i) { return ((i >= 0 && i <= 4) ? "dayLabel mono axis axis-workweek" : "dayLabel mono axis"); });
+
+				var topLabels = svg.selectAll(".timeLabel")
+					.data(dataLabels)
+					.enter().append("text")
+						.text(function(d) { return d; })
+						.attr("x", function(d, i) { return i * gridSize; })
+						.attr("y", 0)
+						.style("text-anchor", "middle")
+						.attr("transform", "translate(" + gridSize / 2 + ", -6)")
+						.attr("class", function(d, i) { return ((i >= 7 && i <= 16) ? "timeLabel mono axis axis-worktime" : "timeLabel mono axis"); });
+
+				var tip = d3.tip()
+					.attr('class', 'd3-tip')
+					.offset([-10, 0])
+					.html(function(d) {
+						return "<strong>Correlation:</strong> <span>" + d['value'].toFixed(4) + "</span>";
+					});
+				
+				svg.call(tip);
+			
 				d3.json('https://cdn.rawgit.com/agjaeger/fred-viz/master/data/correlated.json',   
 					function(error, data) {	
 						var colorScale = d3.scale.quantile()
@@ -103,39 +150,38 @@
 							.attr("height", gridSize - 10)
 							.style("fill", function(d) { return colorScale(d['value']); })
 							.on('mouseover', tip.show)
-							.on('mouseout', tip.hide)
+							.on('mouseleave', tip.hide)
 							.on('click', function(d) {
+								tip.hide();
 								var keyPair = d['key'].split('-');
 								lineGraph(keyPair[0], keyPair[1]);
 							});
 							
 						var legend = svg.selectAll(".legend")
-							.data(d3.entries(data));
+							.data([0].concat(colorScale.quantiles()), function(d) { return d; });
 
 						legend.enter().append("g")
 							.attr("class", "legend");
 
 						legend.append("rect")
-							.attr("id", function(d) { return d['key'] })
-							.attr("x", function(d) { 
-								var index = dataLabels.indexOf(d['key'].split('-')[0]);
-								return legendElementWidth * index; 
+							.attr("x", function(d, i) { 
+								return legendElementWidth * i - 5; 
 							})
-							.attr("y", height)
+							.attr("y", width)
 							.attr("width", legendElementWidth)
 							.attr("height", gridSize / 2)
-							.style("fill", function(d) {
-								var index = dataLabels.indexOf(d['key'].split('-')[0]);
-								return colors[index]; 
+							.style("fill", function(d, i) {
+								return colors[i];
 							});
 
 						legend.append("text")
 							.attr("class", "mono")
 							.text(function(d) {
-								return "≥ " + Math.round(d); 
+								console.log(d);
+								return "≥ " + d.toFixed(2); 
 							})
-							.attr("x", function(d, i) { return legendElementWidth * i; })
-							.attr("y", height + gridSize);
+							.attr("x", function(d, i) { return legendElementWidth * i - 5; })
+							.attr("y", width + gridSize / 2 + 15);
 
 						legend.exit().remove();
 					}
