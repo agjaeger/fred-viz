@@ -1,94 +1,136 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <html>
-  <head>
-	<link rel='stylesheet' type='text/css' href='assets/css/index.css'>
-	
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
-    <script src="http://d3js.org/d3.v3.js"></script>
-    <script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
-  </head>
+	<head>
+		<link rel='stylesheet' type='text/css' href='assets/css/index.css'>
+
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+		<script src="http://d3js.org/d3.v3.js"></script>
+		<script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+	</head>
  
-	<body>
-		<div id="chart"></div>
-		<div id="dataset-picker"></div>
-    
+	<body>    
 		<script type="text/javascript">
-			var margin = { top: 50, right: 0, bottom: 100, left: 100 };
-			var width = 480 - margin.left - margin.right;
-			var height = 500 - margin.top - margin.bottom;
-
-			var svg = d3.select("#chart").append("svg")
-				.attr("width", width + margin.left + margin.right)
-				.attr("height", height + margin.top + margin.bottom)
-				.append("g")
-				.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-			var lineGraph = function(key1, key2) {
-				d3.selectAll("svg > *").remove();
+			var zipped = 0;
+			$.ajax({
+				type: 'GET',
+				dataType: "json",
+				async: false, // TODO make it async
+				url: 'https://cdn.rawgit.com/agjaeger/fred-viz/master/data/zipped.json',
+				success: function(data) {
+					zipped = data;
+				}
+			});
 				
-				var	parseDate = d3.time.format("%d-%b-%y").parse;
+			var lineGraph = function(key1, key2) {			
+				var margin = { top: 0, right: 100, bottom: 100, left: 100 };
+				var width = 1100 - margin.left - margin.right;
+				var height = 600 - margin.top - margin.bottom;
+
+				var lgsvg = d3.select("body").append("svg")
+					.attr("width", width + margin.left + margin.right)
+					.attr("height", height + margin.top + margin.bottom)
+					.append("g")
+					.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 				
-				var	margin = {top: 30, right: 40, bottom: 30, left: 50};
-				var width = 600 - margin.left - margin.right;
-				var height = 270 - margin.top - margin.bottom;
+				var parseDate = d3.time.format("%Y-%d-%m").parse;						
 
 				var	x = d3.time.scale().range([0, width]);
 				var	y = d3.scale.linear().range([height, 0]);
-
-				var	xAxis = d3.svg.axis().scale(x)
-					.orient("bottom").ticks(5);
-
-				var	yAxis = d3.svg.axis().scale(y)
-					.orient("left").ticks(5);
-	
+									
 				var keyline1 = d3.svg.line()
 					.x(function(d) {
-						return x(d.date); 
+						return x(parseDate(d['key']));
 					})
-					.y(function(d) { 
-						return y(d.open); 
-					});
+					.y(function(d) {
+						return y(d['value'][key1]); 
+					})
+					.interpolate("linear");
 	
 				var keyline2 = d3.svg.line()
 					.x(function(d) {
-						return x(d.date); 
+						return x(parseDate(d['key']));
 					})
-					.y(function(d) { 
-						return y(d.open); 
-					});
-
-				d3.json('https://cdn.rawgit.com/agjaeger/fred-viz/master/data/zipped.json',   
-					function(error, data) {	
-						x.domain(d3.extent(data, function(d) { return d.date; }));
-						y.domain([0, d3.max(data, function(d) { return Math.max(d.close, d.open); })]);
+					.y(function(d) {
+						return y(d['value'][key2]); 
+					})
+					.interpolate("linear");
+					
+				var values1 = [];
+				var values2 = [];
+				var keys = [];
+				
+				Object.keys(zipped).sort().forEach(function(key) {
+					keys.push(parseDate(key));
+				});
+				
+				Object.keys(zipped).sort().forEach(function(key) {
+					values1.push(zipped[key][key1]);
+				});
+				
+				Object.keys(zipped).sort().forEach(function(key) {
+					values2.push(zipped[key][key2]);
+				});
+				
+				values1Min = values1.sort(function(a,b){return a-b;})[0];
+				values1Max = values1.sort(function(a,b){return b-a;})[0];
+				
+				values2Min = values2.sort(function(a,b){return a-b;})[0];
+				values2Max = values2.sort(function(a,b){return b-a;})[0];
+				
+				x.domain([d3.min(keys), d3.max(keys)]);
+				y.domain([values1Min, values1Max]);
 						
-						// Keyline 1
-						svg.append("path")
-							.attr("class", "line")
-							.attr("d", keyline1(d3.entries(data)));
+				var	xAxis = d3.svg.axis().scale(x)
+					.orient("bottom").ticks(10);
 
-						// Keyline 2
-						svg.append("path")
-							.attr("class", "line")
-							.style("stroke", "red")
-							.attr("d", keyline2(d3.entries(data)));
+				var	key1YAxis = d3.svg.axis().scale(y)
+					.orient("left").ticks(11);
+				
+				var	key2YAxis = d3.svg.axis().scale(y)
+					.orient("right").ticks(5);
+						
+				// X Axis
+				lgsvg.append("g")
+					.attr("class", "x axis")
+					.attr("transform", "translate(0," + height + ")")
+					.call(xAxis);
 
-						// X Axis
-						svg.append("g")
-							.attr("class", "x axis")
-							.attr("transform", "translate(0," + height + ")")
-							.call(xAxis);
-
-						// Y Axis
-						svg.append("g")
-							.attr("class", "y axis")
-							.call(yAxis);
-					}
-				);
+				// Y Axis
+				lgsvg.append("g")
+					.attr("class", "y axis")
+					.call(key1YAxis);
+					
+				lgsvg.append("g")
+					.attr("class", "y axis")
+					.attr("transform", "translate(" + width + ",0)")
+					.attr("stroke", "red")
+					.call(key2YAxis);	
+						
+				// Keyline 1
+				lgsvg.append("path")
+					.attr("d", keyline1(d3.entries(zipped)))
+					.attr("fill","none")
+					.attr("stroke", "black");
+					
+				// Keyline 2
+				lgsvg.append("path")
+					.attr("d", keyline2(d3.entries(zipped)))
+					.attr("fill","none")
+					.attr("stroke", "red");
 			};
 			
 			var heatmapChart = function() {
+				var margin = { top: 50, right: 0, bottom: 100, left: 100 };
+				var width = 480 - margin.left - margin.right;
+				var height = 500 - margin.top - margin.bottom;
+
+				var svg = d3.select("body").append("svg")
+					.attr("width", width + margin.left + margin.right)
+					.attr("height", height + margin.top + margin.bottom)
+					.append("g")
+					.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
 				var gridSize = Math.floor(width / 6);
 				var buckets = 9;
 				var legendElementWidth = width / buckets;
@@ -102,8 +144,8 @@
 						.attr("x", 0)
 						.attr("y", function (d, i) { return i * gridSize; })
 						.style("text-anchor", "end")
-						.attr("transform", "translate(-6," + gridSize / 1.5 + ")")
-						.attr("class", function (d, i) { return ((i >= 0 && i <= 4) ? "dayLabel mono axis axis-workweek" : "dayLabel mono axis"); });
+						.attr("transform", "translate(-8," + gridSize / 2 + ")")
+						.attr("class", function (d, i) { return "dayLabel mono axis axis-workweek"; });
 
 				var topLabels = svg.selectAll(".timeLabel")
 					.data(dataLabels)
@@ -113,7 +155,7 @@
 						.attr("y", 0)
 						.style("text-anchor", "middle")
 						.attr("transform", "translate(" + gridSize / 2 + ", -6)")
-						.attr("class", function(d, i) { return ((i >= 7 && i <= 16) ? "timeLabel mono axis axis-worktime" : "timeLabel mono axis"); });
+						.attr("class", function(d, i) { return "timeLabel mono axis axis-worktime"; });
 
 				var tip = d3.tip()
 					.attr('class', 'd3-tip')
@@ -144,8 +186,6 @@
 								var index = dataLabels.indexOf(d['key'].split('-')[1]);
 								return index * gridSize;
 							})
-							.attr("rx", 4)
-							.attr("ry", 4)
 							.attr("width", gridSize - 10)
 							.attr("height", gridSize - 10)
 							.style("fill", function(d) { return colorScale(d['value']); })
@@ -154,7 +194,7 @@
 							.on('click', function(d) {
 								tip.hide();
 								var keyPair = d['key'].split('-');
-								lineGraph(keyPair[0], keyPair[1]);
+								updateLineGraph(keyPair[0], keyPair[1]);
 							});
 							
 						var legend = svg.selectAll(".legend")
@@ -177,7 +217,6 @@
 						legend.append("text")
 							.attr("class", "mono")
 							.text(function(d) {
-								console.log(d);
 								return "≥ " + d.toFixed(2); 
 							})
 							.attr("x", function(d, i) { return legendElementWidth * i - 5; })
@@ -188,7 +227,8 @@
 				);  
 			};
 		
-			heatmapChart();
+			//heatmapChart();
+			lineGraph('EXPGE', 'EXPCH');
 		</script>
 	</body>
 </html>
